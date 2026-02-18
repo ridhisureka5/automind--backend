@@ -231,3 +231,107 @@ def vehicle_health(vin: Optional[str] = None):
             for v, d in live_vehicle_data.items()
         ]
     }
+# ===========================
+# AGENT GOVERNANCE (UEBA)
+# ===========================
+
+@app.get("/agent-governance")
+def agent_governance():
+
+    agent_ids = [
+        "data-agent",
+        "diagnostics-agent",
+        "customer-agent",
+        "scheduling-agent",
+        "manufacturing-agent",
+        "security-agent"
+    ]
+
+    agents_output = []
+
+    trust_values = []
+    anomalies_total = 0
+    actions_total = 0
+
+    for aid in agent_ids:
+
+        # --------------------------
+        # Simulated behavioral logs
+        # --------------------------
+        actions = random.randint(20, 120)
+        anomalies = random.randint(0, 12)
+        failed_logins = random.randint(0, 5)
+        unusual_hours = random.randint(0, 10)
+        data_access = random.randint(10, 200)
+
+        X = pd.DataFrame([{
+            "actions": actions,
+            "anomalies": anomalies,
+            "failed_logins": failed_logins,
+            "unusual_hours": unusual_hours,
+            "data_access": data_access
+        }])
+
+        # --------------------------
+        # TRUST SCORE (ML)
+        # --------------------------
+        if ueba_trust_model:
+            trust = float(ueba_trust_model.predict(X)[0])
+        else:
+            trust = 100 - (anomalies * 4 + failed_logins * 5 + unusual_hours * 2)
+
+        trust = max(50, min(100, round(trust,1)))
+
+        # --------------------------
+        # RISK LEVEL
+        # --------------------------
+        if trust > 90:
+            risk = "LOW"
+            status = "Healthy"
+        elif trust > 75:
+            risk = "MEDIUM"
+            status = "Monitor"
+        else:
+            risk = "HIGH"
+            status = "Restricted"
+
+        agents_output.append({
+            "id": aid,
+            "name": aid.replace("-", " ").title(),
+            "trust": trust,
+            "actions": actions,
+            "anomalies": anomalies,
+            "risk": risk,
+            "status": status
+        })
+
+        trust_values.append(trust)
+        anomalies_total += anomalies
+        actions_total += actions
+
+    # --------------------------
+    # SUMMARY (ML)
+    # --------------------------
+    summary_X = pd.DataFrame([{
+        "agents": len(agent_ids),
+        "avg_trust": sum(trust_values)/len(trust_values),
+        "total_anomalies": anomalies_total,
+        "total_actions": actions_total
+    }])
+
+    if ueba_summary_model:
+        summary_pred = ueba_summary_model.predict(summary_X)[0]
+    else:
+        summary_pred = sum(trust_values)/len(trust_values)
+
+    summary = {
+        "active_agents": len(agent_ids),
+        "avg_trust": round(sum(trust_values)/len(trust_values),1),
+        "anomalies": anomalies_total,
+        "actions": actions_total
+    }
+
+    return {
+        "agents": agents_output,
+        "summary": summary
+    }
