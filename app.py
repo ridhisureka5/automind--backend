@@ -24,16 +24,20 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ===========================
-# MODEL LOADER
+# MODEL LOADER (SAFE CLOUD LOADER)
 # ===========================
 
 def safe_load(name):
-    path = os.path.join(BASE_DIR, name)
-    if os.path.exists(path):
-        print(f"✅ {name} loaded")
-        return joblib.load(path)
-    else:
-        print(f"⚠️ {name} missing — demo mode")
+    try:
+        path = os.path.join(BASE_DIR, name)
+        if os.path.exists(path):
+            print(f"✅ {name} loaded")
+            return joblib.load(path)
+        else:
+            print(f"⚠️ {name} missing — demo mode")
+            return None
+    except Exception as e:
+        print(f"❌ Failed loading {name}: {e}")
         return None
 
 # ===========================
@@ -150,8 +154,12 @@ def master_agent():
         "failures":failures
     }])
 
-    intelligence=float(master_web_model.predict(X)[0]) if master_web_model else random.randint(80,97)
-    decision=float(master_app_model.predict(X)[0]) if master_app_model else random.randint(0,3)
+    try:
+        intelligence=float(master_web_model.predict(X)[0]) if master_web_model else random.randint(80,97)
+        decision=float(master_app_model.predict(X)[0]) if master_app_model else random.randint(0,3)
+    except:
+        intelligence=random.randint(80,97)
+        decision=random.randint(0,3)
 
     decision_map={
         0:"Normal Monitoring",
@@ -205,7 +213,7 @@ def receive_telemetry(data: Telemetry, x_api_key: str = Header(None)):
     return {"status": "received", "vin": vin}
 
 # ===========================
-# VEHICLE HEALTH API (FIXED)
+# VEHICLE HEALTH API
 # ===========================
 
 @app.get("/vehicle-health")
@@ -214,124 +222,91 @@ def vehicle_health(vin: Optional[str] = None):
     if len(live_vehicle_data) == 0:
         raise HTTPException(status_code=404, detail="No telemetry received yet")
 
-    # Single vehicle lookup
     if vin:
         if vin not in live_vehicle_data:
             raise HTTPException(status_code=404, detail="Vehicle not found")
-        return {
-            "vin": vin,
-            "data": live_vehicle_data[vin]
-        }
+        return {"vin": vin, "data": live_vehicle_data[vin]}
 
-    # Return full fleet
     return {
         "fleet_size": len(live_vehicle_data),
-        "vehicles": [
-            {"vin": v, "data": d}
-            for v, d in live_vehicle_data.items()
-        ]
+        "vehicles": [{"vin": v, "data": d} for v, d in live_vehicle_data.items()]
     }
+
 # ===========================
-# AGENT GOVERNANCE (UEBA)
+# AGENT GOVERNANCE (UEBA) — FIXED
 # ===========================
 
 @app.get("/agent-governance")
 def agent_governance():
 
-    agent_ids = [
-        "data-agent",
-        "diagnostics-agent",
-        "customer-agent",
-        "scheduling-agent",
-        "manufacturing-agent",
-        "security-agent"
-    ]
+    try:
+        agent_ids = [
+            "data-agent",
+            "diagnostics-agent",
+            "customer-agent",
+            "scheduling-agent",
+            "manufacturing-agent",
+            "security-agent"
+        ]
 
-    agents_output = []
+        agents_output=[]
+        trust_values=[]
+        anomalies_total=0
+        actions_total=0
 
-    trust_values = []
-    anomalies_total = 0
-    actions_total = 0
+        for aid in agent_ids:
 
-    for aid in agent_ids:
+            actions=random.randint(20,120)
+            anomalies=random.randint(0,12)
+            failed_logins=random.randint(0,5)
+            unusual_hours=random.randint(0,10)
+            data_access=random.randint(10,200)
 
-        # --------------------------
-        # Simulated behavioral logs
-        # --------------------------
-        actions = random.randint(20, 120)
-        anomalies = random.randint(0, 12)
-        failed_logins = random.randint(0, 5)
-        unusual_hours = random.randint(0, 10)
-        data_access = random.randint(10, 200)
+            X=pd.DataFrame([[actions,anomalies,failed_logins,unusual_hours,data_access]],
+                           columns=["actions","anomalies","failed_logins","unusual_hours","data_access"])
 
-        X = pd.DataFrame([{
-            "actions": actions,
-            "anomalies": anomalies,
-            "failed_logins": failed_logins,
-            "unusual_hours": unusual_hours,
-            "data_access": data_access
-        }])
+            trust=None
+            if ueba_trust_model is not None:
+                try:
+                    trust=float(ueba_trust_model.predict(X)[0])
+                except Exception as e:
+                    print("UEBA model error:",e)
 
-        # --------------------------
-        # TRUST SCORE (ML)
-        # --------------------------
-        if ueba_trust_model:
-            trust = float(ueba_trust_model.predict(X)[0])
-        else:
-            trust = 100 - (anomalies * 4 + failed_logins * 5 + unusual_hours * 2)
+            if trust is None:
+                trust=100-(anomalies*4+failed_logins*5+unusual_hours*2)
 
-        trust = max(50, min(100, round(trust,1)))
+            trust=max(50,min(100,round(trust,1)))
 
-        # --------------------------
-        # RISK LEVEL
-        # --------------------------
-        if trust > 90:
-            risk = "LOW"
-            status = "Healthy"
-        elif trust > 75:
-            risk = "MEDIUM"
-            status = "Monitor"
-        else:
-            risk = "HIGH"
-            status = "Restricted"
+            if trust>90:
+                risk="LOW"; status="Healthy"
+            elif trust>75:
+                risk="MEDIUM"; status="Monitor"
+            else:
+                risk="HIGH"; status="Restricted"
 
-        agents_output.append({
-            "id": aid,
-            "name": aid.replace("-", " ").title(),
-            "trust": trust,
-            "actions": actions,
-            "anomalies": anomalies,
-            "risk": risk,
-            "status": status
-        })
+            agents_output.append({
+                "id":aid,
+                "name":aid.replace("-"," ").title(),
+                "trust":trust,
+                "actions":actions,
+                "anomalies":anomalies,
+                "risk":risk,
+                "status":status
+            })
 
-        trust_values.append(trust)
-        anomalies_total += anomalies
-        actions_total += actions
+            trust_values.append(trust)
+            anomalies_total+=anomalies
+            actions_total+=actions
 
-    # --------------------------
-    # SUMMARY (ML)
-    # --------------------------
-    summary_X = pd.DataFrame([{
-        "agents": len(agent_ids),
-        "avg_trust": sum(trust_values)/len(trust_values),
-        "total_anomalies": anomalies_total,
-        "total_actions": actions_total
-    }])
+        summary={
+            "active_agents":len(agent_ids),
+            "avg_trust":round(sum(trust_values)/len(trust_values),1),
+            "anomalies":anomalies_total,
+            "actions":actions_total
+        }
 
-    if ueba_summary_model:
-        summary_pred = ueba_summary_model.predict(summary_X)[0]
-    else:
-        summary_pred = sum(trust_values)/len(trust_values)
+        return {"agents":agents_output,"summary":summary}
 
-    summary = {
-        "active_agents": len(agent_ids),
-        "avg_trust": round(sum(trust_values)/len(trust_values),1),
-        "anomalies": anomalies_total,
-        "actions": actions_total
-    }
-
-    return {
-        "agents": agents_output,
-        "summary": summary
-    }
+    except Exception as e:
+        print("AGENT GOVERNANCE ERROR:",e)
+        return {"agents":[],"summary":{}}
