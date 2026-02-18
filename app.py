@@ -76,7 +76,7 @@ ueba_rules_model = safe_load("ueba_rules.pkl")
 ueba_summary_model = safe_load("ueba_backend_summary.pkl")
 
 # ===========================
-# 🔥 MASTER AGENT MODELS (MISSING PART FIXED)
+# MASTER AGENT MODELS
 # ===========================
 
 master_web_model = safe_load("master_website_output.pkl")
@@ -172,6 +172,7 @@ def master_agent():
             "decision":decision_map.get(int(decision),"Monitoring")
         }
     }
+
 # ===========================
 # TELEMETRY INGEST API
 # ===========================
@@ -184,7 +185,6 @@ def receive_telemetry(data: Telemetry, x_api_key: str = Header(None)):
 
     vin = data.vin
 
-    # Store latest vehicle state
     live_vehicle_data[vin] = {
         "ts": int(time.time()),
         "mode": data.mode,
@@ -204,9 +204,8 @@ def receive_telemetry(data: Telemetry, x_api_key: str = Header(None)):
 
     return {"status": "received", "vin": vin}
 
-
 # ===========================
-# VEHICLE HEALTH API
+# VEHICLE HEALTH API (FIXED)
 # ===========================
 
 @app.get("/vehicle-health")
@@ -215,16 +214,20 @@ def vehicle_health(vin: Optional[str] = None):
     if len(live_vehicle_data) == 0:
         raise HTTPException(status_code=404, detail="No telemetry received yet")
 
-    # specific vehicle
+    # Single vehicle lookup
     if vin:
         if vin not in live_vehicle_data:
             raise HTTPException(status_code=404, detail="Vehicle not found")
-        return live_vehicle_data[vin]
+        return {
+            "vin": vin,
+            "data": live_vehicle_data[vin]
+        }
 
-    # latest vehicle
-    latest_vin = list(live_vehicle_data.keys())[-1]
+    # Return full fleet
     return {
-        "vin": latest_vin,
-        "data": live_vehicle_data[latest_vin],
-        "fleet_size": len(live_vehicle_data)
+        "fleet_size": len(live_vehicle_data),
+        "vehicles": [
+            {"vin": v, "data": d}
+            for v, d in live_vehicle_data.items()
+        ]
     }
