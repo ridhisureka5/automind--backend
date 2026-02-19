@@ -117,6 +117,7 @@ alert_priority_model = safe_load("alert_priority_model.pkl")
 rul_model = safe_load("rul_model.pkl")
 technician_perf_model = safe_load("technician_performance_model.pkl")
 
+
 # ===========================
 # FEEDBACK MODELS
 # ===========================
@@ -125,14 +126,8 @@ feedback_bundle = safe_load("website_feedback_update.pkl")
 rating_bundle = safe_load("service_center_rating_update.pkl")
 experience_bundle = safe_load("customer_experience_log.pkl")
 
-def unpack(bundle):
-    if isinstance(bundle, dict):
-        return bundle.get("model"), bundle.get("vectorizer")
-    return bundle, None
 
-feedback_model, feedback_vectorizer = unpack(feedback_bundle)
-rating_model, rating_vectorizer = unpack(rating_bundle)
-experience_model, experience_vectorizer = unpack(experience_bundle)
+
 # ===========================
 # ADVANCED MANUFACTURING AI MODELS (NEW)
 # ===========================
@@ -184,8 +179,27 @@ master_app_model = safe_load("master_app_output.pkl")
 API_KEY = "AUTOMIND_DEMO_KEY"
 
 # ===========================
+# SERVICE CENTER LOAD MODELS
+# ===========================
+
+load_model = safe_load("load_model.pkl")
+history_model = safe_load("service_history_update.pkl")
+rating_bundle = safe_load("service_center_rating_update.pkl")
+def unpack(bundle):
+    if isinstance(bundle, dict):
+        return bundle.get("model"), bundle.get("vectorizer")
+    return bundle, None
+
+rating_model, rating_vectorizer = unpack(rating_bundle)
+def load_label(value):
+    if value >= 0.75: return "HIGH"
+    if value >= 0.45: return "MEDIUM"
+    return "LOW"
+
+# ===========================
 # LIVE TELEMETRY STORAGE
 # ===========================
+
 
 live_vehicle_data: Dict[str, dict] = {}
 
@@ -700,4 +714,71 @@ def feedback_analytics():
         },
         "categories":categories,
         "complaints":complaints
+    }
+@app.get("/load-prediction")
+def load_prediction():
+
+    centers_data = [
+        ("AutoMind Prime","Delhi"),
+        ("RapidFix Motors","Gurgaon"),
+        ("CityCare Service","Noida"),
+        ("NorthZone Auto","Rohini"),
+        ("Metro Garage","Janakpuri"),
+        ("Elite AutoWorks","Dwarka")
+    ]
+
+    centers=[]
+    loads=[]
+
+    for i,(name,city) in enumerate(centers_data):
+
+        bookings=random.randint(10,80)
+        technicians=random.randint(3,12)
+        repeat=random.randint(0,30)
+
+        X=pd.DataFrame([[bookings,technicians,repeat]],
+                       columns=["bookings","technicians","repeat"])
+
+        try:
+            load=float(load_model.predict(X)[0]) if load_model else random.random()
+        except:
+            load=random.random()
+
+        label=load_label(load)
+
+        utilization=min(100,round(load*100))
+
+        advice={
+            "HIGH":"Add technicians or redirect bookings",
+            "MEDIUM":"Monitor and prepare backup staff",
+            "LOW":"Promote offers to increase bookings"
+        }[label]
+
+        centers.append({
+            "id":i+1,
+            "name":name,
+            "city":city,
+            "utilization":utilization,
+            "predicted_load":label,
+            "recommendation":advice,
+            "slots_filling_fast":utilization>85
+        })
+
+        loads.append(load)
+
+    avg_load=sum(loads)/len(loads)
+    global_label=load_label(avg_load)
+
+    global_advice={
+        "HIGH":"Shift bookings to nearby centers",
+        "MEDIUM":"Balanced load across centers",
+        "LOW":"Increase marketing campaigns"
+    }[global_label]
+
+    return {
+        "global":{
+            "predicted_load":global_label,
+            "recommendation":global_advice
+        },
+        "centers":centers
     }
