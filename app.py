@@ -26,6 +26,62 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # ===========================
 # MODEL LOADER (SAFE CLOUD LOADER)
 # ===========================
+def predict_sentiment(text):
+
+    if feedback_sentiment_model:
+        try:
+            pred = feedback_sentiment_model.predict([text])[0]
+            mapping = {0:"negative",1:"neutral",2:"positive"}
+            return mapping.get(pred,"neutral")
+        except:
+            pass
+
+    # fallback demo
+    if any(w in text.lower() for w in ["bad","worst","delay","issue"]):
+        return "negative"
+    if any(w in text.lower() for w in ["ok","fine"]):
+        return "neutral"
+    return "positive"
+
+
+def predict_category(text):
+
+    if category_model and category_vectorizer:
+        try:
+            X = category_vectorizer.transform([text])
+            return category_model.predict(X)[0]
+        except:
+            pass
+
+    keywords={
+        "service":"Service",
+        "engine":"Engine",
+        "delay":"Delivery",
+        "price":"Pricing",
+        "app":"App Experience"
+    }
+
+    for k,v in keywords.items():
+        if k in text.lower():
+            return v
+    return "General"
+
+
+def predict_rating(text):
+
+    if experience_model and experience_vectorizer:
+        try:
+            X=experience_vectorizer.transform([text])
+            return int(experience_model.predict(X)[0])
+        except:
+            pass
+
+    if "excellent" in text.lower(): return 5
+    if "good" in text.lower(): return 4
+    if "ok" in text.lower(): return 3
+    if "bad" in text.lower(): return 2
+    return 1
+
 
 def safe_load(name):
     try:
@@ -45,6 +101,12 @@ def safe_load(name):
 # ===========================
 
 vehicle_model = safe_load("vehicle_model.pkl")
+# ===========================
+# INVENTORY AI MODEL
+# ===========================
+
+inventory_model = safe_load("inventory_model.pkl")
+
 # ===========================
 # SERVICE CENTER AI DASHBOARD
 # ===========================
@@ -88,6 +150,21 @@ wokwi_anomaly_model = safe_load("wokwi_sensor_anomaly_model.pkl")
 service_history_model = safe_load("service_history_update.pkl")
 learning_signal_model = safe_load("learning_signal.pkl")
 quality_alerts_model = safe_load("quality_alerts_dashboard.pkl")
+# ===========================
+# FEEDBACK ANALYTICS MODELS
+# ===========================
+
+feedback_sentiment_model = safe_load("feedback_model.pkl")
+feedback_category_bundle = safe_load("website_feedback_update.pkl")
+experience_bundle = safe_load("customer_experience_log.pkl")
+
+def unpack(bundle):
+    if isinstance(bundle, dict):
+        return bundle.get("model"), bundle.get("vectorizer")
+    return bundle, None
+
+category_model, category_vectorizer = unpack(feedback_category_bundle)
+experience_model, experience_vectorizer = unpack(experience_bundle)
 
 # ===========================
 # UEBA MODELS
@@ -515,3 +592,112 @@ def service_predictions():
         })
 
     return {"services":services}
+
+
+@app.get("/inventory-analytics")
+def inventory_analytics():
+
+    parts = [
+        ("Brake Pads","BP-221","Brakes",120),
+        ("Oil Filter","OF-332","Engine",40),
+        ("Air Filter","AF-876","HVAC",35),
+        ("Spark Plug","SP-111","Engine",25),
+        ("Clutch Plate","CP-909","Transmission",220),
+        ("Coolant Pump","CP-450","Cooling",180),
+        ("Battery","BT-222","Electrical",150),
+        ("ABS Sensor","ABS-01","Electrical",95)
+    ]
+
+    inventory=[]
+
+    for name,sku,category,price in parts:
+
+        usage=random.randint(10,80)
+        vehicles=random.randint(50,300)
+        season=random.randint(0,1)  # seasonal demand
+
+        X=pd.DataFrame([[usage,vehicles,season]],
+                       columns=["usage","vehicles","season"])
+
+        try:
+            demand=float(inventory_model.predict(X)[0]) if inventory_model else random.randint(2,12)
+        except:
+            demand=random.randint(2,12)
+
+        demand=max(1,round(demand))
+
+        max_stock=random.randint(20,80)
+        current_stock=max(1,max_stock - random.randint(0,max_stock))
+
+        inventory.append({
+            "name":name,
+            "sku":sku,
+            "category":category,
+            "stock":f"{current_stock}/{max_stock}",
+            "ai_demand":f"{demand}/week",
+            "price":price
+        })
+
+    return {"inventory":inventory}
+
+@app.get("/feedback-analytics")
+def feedback_analytics():
+
+    feedback_samples = [
+        ("Rahul","Service was excellent and quick"),
+        ("Amit","App is slow and confusing"),
+        ("Sneha","Delivery delay but staff helpful"),
+        ("Karan","Engine issue resolved quickly"),
+        ("Neha","Bad experience very late response"),
+        ("Riya","Everything ok nothing special"),
+        ("Vikram","Great service support team"),
+        ("Ankit","Price too high compared to market"),
+        ("Meera","Very satisfied with service"),
+        ("Arjun","Worst booking experience")
+    ]
+
+    complaints=[]
+    categories={}
+    positive=0
+    neutral=0
+    negative=0
+    rating_sum=0
+
+    for name,text in feedback_samples:
+
+        sentiment=predict_sentiment(text)
+        category=predict_category(text)
+        rating=predict_rating(text)
+
+        if sentiment=="positive": positive+=1
+        elif sentiment=="neutral": neutral+=1
+        else: negative+=1
+
+        rating_sum+=rating
+
+        categories[category]=categories.get(category,0)+1
+
+        complaints.append({
+            "name":name,
+            "rating":rating,
+            "category":category,
+            "text":text,
+            "date":time.strftime("%d %b %Y"),
+            "sentiment":sentiment
+        })
+
+    total=len(complaints)
+    avg_rating=round(rating_sum/total,2)
+
+    return {
+        "total_feedback":total,
+        "avg_rating":avg_rating,
+        "sentiment":{
+            "positive":positive,
+            "neutral":neutral,
+            "negative":negative,
+            "positive_percent":round((positive/total)*100)
+        },
+        "categories":categories,
+        "complaints":complaints
+    }
