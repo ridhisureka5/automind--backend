@@ -95,6 +95,39 @@ def safe_load(name):
     except Exception as e:
         print(f"❌ Failed loading {name}: {e}")
         return None
+# ===========================
+# TECHNICIAN ANALYTICS MODELS
+# ===========================
+
+technician_skill_model = safe_load("technician_model.pkl")
+technician_perf_model = safe_load("technician_performance_model.pkl")
+service_history_model = safe_load("service_history_update.pkl")
+
+skills = ["Engine","Electrical","Brakes","Transmission","Diagnostics","HVAC"]
+
+def predict_skill(exp, jobs):
+    try:
+        X=pd.DataFrame([[exp,jobs]],columns=["experience","jobs"])
+        idx=int(technician_skill_model.predict(X)[0]) if technician_skill_model else random.randint(0,5)
+        return skills[idx%len(skills)]
+    except:
+        return random.choice(skills)
+
+def predict_rating(exp, jobs):
+    try:
+        X=pd.DataFrame([[exp,jobs]],columns=["experience","jobs"])
+        r=float(technician_perf_model.predict(X)[0]) if technician_perf_model else random.uniform(3.5,5)
+        return round(max(3,min(5,r)),1)
+    except:
+        return round(random.uniform(3.5,5),1)
+
+def predict_load(exp, jobs):
+    try:
+        X=pd.DataFrame([[exp,jobs]],columns=["experience","jobs"])
+        load=float(service_history_model.predict(X)[0]) if service_history_model else random.random()
+        return int(min(100,max(5,load*100)))
+    except:
+        return random.randint(10,95)
 
 # ===========================
 # VEHICLE MODEL
@@ -789,4 +822,55 @@ def load_prediction():
             "recommendation":global_advice
         },
         "centers":centers
+    }
+@app.get("/technician-analytics")
+def technician_analytics():
+
+    names=[
+        "Rahul Sharma","Amit Verma","Sneha Kapoor",
+        "Karan Mehta","Neha Singh","Vikram Patel"
+    ]
+
+    technicians=[]
+    working=0
+    available=0
+    rating_sum=0
+
+    for i,name in enumerate(names):
+
+        exp=random.randint(1,15)
+        jobs=random.randint(5,120)
+
+        skill=predict_skill(exp,jobs)
+        rating=predict_rating(exp,jobs)
+        load=predict_load(exp,jobs)
+
+        status="Working" if load>55 else "Available"
+
+        if status=="Working": working+=1
+        else: available+=1
+
+        rating_sum+=rating
+
+        technicians.append({
+            "id":i+1,
+            "name":name,
+            "experience":exp,
+            "skill":skill,
+            "rating":rating,
+            "jobs":jobs,
+            "status":status,
+            "load":load
+        })
+
+    total=len(technicians)
+
+    return {
+        "summary":{
+            "total":total,
+            "available":available,
+            "working":working,
+            "avg_rating":round(rating_sum/total,2)
+        },
+        "technicians":technicians
     }
