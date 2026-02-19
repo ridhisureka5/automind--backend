@@ -657,27 +657,35 @@ def inventory_analytics():
 @app.get("/feedback-analytics")
 def feedback_analytics():
 
-    feedback_samples = [
-        ("Rahul","Service was excellent and quick"),
-        ("Amit","App is slow and confusing"),
-        ("Sneha","Delivery delay but staff helpful"),
-        ("Karan","Engine issue resolved quickly"),
-        ("Neha","Bad experience very late response"),
-        ("Riya","Everything ok nothing special"),
-        ("Vikram","Great service support team"),
-        ("Ankit","Price too high compared to market"),
-        ("Meera","Very satisfied with service"),
-        ("Arjun","Worst booking experience")
+    base_feedback = [
+        "service was quick",
+        "engine problem fixed",
+        "late delivery",
+        "app confusing",
+        "price high",
+        "very helpful staff",
+        "bad response time",
+        "excellent support",
+        "average experience",
+        "booking failed"
+    ]
+
+    users=["Rahul","Amit","Sneha","Karan","Neha","Riya","Vikram","Ankit","Meera","Arjun"]
+
+    modifiers=[
+        "very","extremely","slightly","unexpectedly","surprisingly",
+        "really","quite","somewhat","barely","properly"
     ]
 
     complaints=[]
     categories={}
-    positive=0
-    neutral=0
-    negative=0
+    positive=neutral=negative=0
     rating_sum=0
 
-    for name,text in feedback_samples:
+    for i in range(len(users)):
+
+        # 🔹 Create dynamic sentence each time
+        text=f"{random.choice(modifiers)} {random.choice(base_feedback)}"
 
         sentiment=predict_sentiment(text)
         category=predict_category(text)
@@ -688,11 +696,10 @@ def feedback_analytics():
         else: negative+=1
 
         rating_sum+=rating
-
         categories[category]=categories.get(category,0)+1
 
         complaints.append({
-            "name":name,
+            "name":users[i],
             "rating":rating,
             "category":category,
             "text":text,
@@ -715,6 +722,7 @@ def feedback_analytics():
         "categories":categories,
         "complaints":complaints
     }
+
 @app.get("/load-prediction")
 def load_prediction():
 
