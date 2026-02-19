@@ -62,6 +62,15 @@ def unpack(bundle):
 feedback_model, feedback_vectorizer = unpack(feedback_bundle)
 rating_model, rating_vectorizer = unpack(rating_bundle)
 experience_model, experience_vectorizer = unpack(experience_bundle)
+# ===========================
+# ADVANCED MANUFACTURING AI MODELS (NEW)
+# ===========================
+
+defect_forecast_model = safe_load("defect_forecast_model.pkl")
+rca_pattern_model = safe_load("rca_pattern_model.pkl")
+supplier_risk_model = safe_load("supplier_risk_model.pkl")
+wokwi_anomaly_model = safe_load("wokwi_sensor_anomaly_model.pkl")
+
 
 # ===========================
 # MANUFACTURING MODELS
@@ -310,3 +319,112 @@ def agent_governance():
     except Exception as e:
         print("AGENT GOVERNANCE ERROR:",e)
         return {"agents":[],"summary":{}}
+@app.get("/manufacturing/defect-forecast")
+def defect_forecast():
+
+    components = ["Engine","Transmission","Brakes","Suspension","Electrical","HVAC"]
+    results=[]
+
+    for comp in components:
+        X=pd.DataFrame([{
+            "component":len(comp),
+            "vehicles":random.randint(100,500),
+            "usage":random.randint(20,90),
+            "temperature":random.randint(40,120)
+        }])
+
+        try:
+            risk=float(defect_forecast_model.predict(X)[0]) if defect_forecast_model else random.random()
+        except:
+            risk=random.random()
+
+        results.append({
+            "component":comp,
+            "failure_probability":round(min(max(risk,0),1),2)
+        })
+
+    return {"forecast":results}
+
+@app.get("/manufacturing/rca-analysis")
+def rca_analysis():
+
+    issues=["Brake wear","Oil leak","Sensor fault","Overheating","Loose wiring"]
+    output=[]
+
+    for issue in issues:
+
+        X=pd.DataFrame([{
+            "freq":random.randint(1,20),
+            "temp":random.randint(30,120),
+            "vibration":random.random()*10
+        }])
+
+        try:
+            cause=int(rca_pattern_model.predict(X)[0]) if rca_pattern_model else random.randint(0,2)
+        except:
+            cause=random.randint(0,2)
+
+        mapping={
+            0:"Manufacturing Defect",
+            1:"Supplier Quality Issue",
+            2:"Design Limitation"
+        }
+
+        output.append({
+            "issue":issue,
+            "root_cause":mapping[cause]
+        })
+
+    return {"rca":output}
+
+
+@app.get("/manufacturing/supplier-risk")
+def supplier_risk():
+
+    suppliers=["AutoParts Global","SupplierTech Inc","Elite Manufacturing","Precision Components"]
+
+    results=[]
+
+    for s in suppliers:
+        X=pd.DataFrame([{
+            "defects":random.randint(1,40),
+            "delay_days":random.randint(0,15),
+            "returns":random.randint(0,20)
+        }])
+
+        try:
+            score=float(supplier_risk_model.predict(X)[0]) if supplier_risk_model else random.random()
+        except:
+            score=random.random()
+
+        level="LOW"
+        if score>0.7: level="HIGH"
+        elif score>0.4: level="MEDIUM"
+
+        results.append({
+            "supplier":s,
+            "risk_score":round(score,2),
+            "risk_level":level
+        })
+
+    return {"suppliers":results}
+
+@app.get("/manufacturing/live-anomaly")
+def live_anomaly():
+
+    X=pd.DataFrame([{
+        "temperature":random.randint(20,120),
+        "vibration":random.random()*15,
+        "pressure":random.randint(20,200)
+    }])
+
+    try:
+        anomaly=int(wokwi_anomaly_model.predict(X)[0]) if wokwi_anomaly_model else random.randint(0,1)
+    except:
+        anomaly=random.randint(0,1)
+
+    return {
+        "factory_alert":"ANOMALY DETECTED" if anomaly==1 else "NORMAL",
+        "severity":"HIGH" if anomaly==1 else "OK"
+    }
+
