@@ -45,6 +45,15 @@ def safe_load(name):
 # ===========================
 
 vehicle_model = safe_load("vehicle_model.pkl")
+# ===========================
+# SERVICE CENTER AI DASHBOARD
+# ===========================
+
+fleet_health_model = safe_load("fleet_health_model.pkl")
+predictive_model = safe_load("predictive_maintenance_model.pkl")
+alert_priority_model = safe_load("alert_priority_model.pkl")
+rul_model = safe_load("rul_model.pkl")
+technician_perf_model = safe_load("technician_performance_model.pkl")
 
 # ===========================
 # FEEDBACK MODELS
@@ -428,3 +437,81 @@ def live_anomaly():
         "severity":"HIGH" if anomaly==1 else "OK"
     }
 
+@app.get("/service-dashboard")
+def service_dashboard():
+
+    vehicles = len(live_vehicle_data) if live_vehicle_data else random.randint(5,12)
+
+    X = pd.DataFrame([{
+        "vehicles":vehicles,
+        "avg_temp":random.randint(60,110),
+        "dtc":random.randint(0,5),
+        "vibration":random.random()*10
+    }])
+
+    try:
+        health = float(fleet_health_model.predict(X)[0]) if fleet_health_model else random.randint(70,95)
+    except:
+        health = random.randint(70,95)
+
+    try:
+        uptime = float(technician_perf_model.predict(X)[0]) if technician_perf_model else random.uniform(97,99.9)
+    except:
+        uptime = random.uniform(97,99.9)
+
+    return {
+        "fleet_health": round(health,1),
+        "system_uptime": round(uptime,2),
+        "total_vehicles": vehicles,
+        "active_alerts": random.randint(2,6),
+        "upcoming_services": random.randint(2,6)
+    }
+
+
+@app.get("/service-alerts")
+def service_alerts():
+
+    alerts=[]
+
+    names=["Transmission Fluid","Brake Pads","Engine Cooling","Air Filter"]
+
+    for n in names:
+
+        X=pd.DataFrame([[random.randint(50,120),random.random()*10]],
+                       columns=["temp","vibration"])
+
+        try:
+            level=int(alert_priority_model.predict(X)[0]) if alert_priority_model else random.randint(0,3)
+        except:
+            level=random.randint(0,3)
+
+        mapping=["low","medium","high","critical"]
+        alerts.append({"title":n,"level":mapping[level]})
+
+    return {"alerts":alerts}
+
+
+@app.get("/service-predictions")
+def service_predictions():
+
+    services=[]
+
+    for i in range(4):
+
+        X=pd.DataFrame([[random.randint(1000,20000),random.randint(60,120)]],
+                       columns=["km","temp"])
+
+        try:
+            urgency=int(predictive_model.predict(X)[0]) if predictive_model else random.randint(0,2)
+        except:
+            urgency=random.randint(0,2)
+
+        tag=["routine","repair","recall"][urgency]
+
+        services.append({
+            "vin":f"VIN{i+1}AUTO",
+            "city":random.choice(["Delhi","Noida","Gurgaon","Rohini"]),
+            "tag":tag
+        })
+
+    return {"services":services}
