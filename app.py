@@ -7,6 +7,8 @@ import pandas as pd
 import os
 import time
 import random
+import torch
+import torch.nn as nn
 
 # ===========================
 # APP SETUP
@@ -239,7 +241,50 @@ live_vehicle_data: Dict[str, dict] = {}
 # ===========================
 # DATA MODELS
 # ===========================
+# =========================================================
+# RCA CAPA AI ENGINE
+# =========================================================
 
+class RCAModel(nn.Module):
+    def __init__(self, out_size):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(4,64),
+            nn.ReLU(),
+            nn.Linear(64,128),
+            nn.ReLU(),
+            nn.Linear(128,64),
+            nn.ReLU(),
+            nn.Linear(64,out_size)
+        )
+
+    def forward(self,x):
+        return self.net(x)
+
+
+# -------- LOAD MODEL SAFELY --------
+try:
+    component_decoder = joblib.load("component_decoder.pkl")
+    rca_actions = joblib.load("rca_actions.pkl")
+
+    rca_model = RCAModel(len(component_decoder))
+    rca_model.load_state_dict(torch.load("rca_model.pt", map_location="cpu"))
+    rca_model.eval()
+
+    print("✅ RCA CAPA AI Loaded")
+
+except Exception as e:
+    print("⚠️ RCA AI Demo Mode:", e)
+    rca_model = None
+    rca_actions = {
+        "Battery":("Thermal degradation","Replace supplier","Improve cooling"),
+        "Cooling":("Coolant inefficiency","Pump replacement","Add monitoring"),
+        "Motor":("Rotor wear","Replace motor","Lubrication schedule"),
+        "Brake":("Pad wear","Replace pads","Predictive maintenance"),
+        "Sensor":("Calibration drift","Recalibrate sensor","Self diagnostics"),
+        "Transmission":("Gear wear","Replace gearbox","Oil monitoring")
+    }
+    component_decoder = list(rca_actions.keys())
 class OBD(BaseModel):
     rpm: int
     speed_kmph: int
@@ -874,3 +919,78 @@ def technician_analytics():
         },
         "technicians":technicians
     }
+# Storage used by your React page
+RCA_CASES = []
+RCA_ID = 1
+def rca_predict(temp, vibration, load, cycles):
+
+    if rca_model is None:
+        # fallback demo
+        comp=random.choice(list(rca_actions.keys()))
+        root,corrective,preventive=rca_actions[comp]
+        return comp,root,corrective,preventive
+
+    x=torch.tensor([[temp,vibration,load,cycles]],dtype=torch.float32)
+
+    with torch.no_grad():
+        pred=rca_model(x)
+        comp_id=torch.argmax(pred).item()
+
+    component=component_decoder[comp_id]
+    root,corrective,preventive=rca_actions[component]
+
+    return component,root,corrective,preventive
+def rca_predict(temp, vibration, load, cycles):
+
+    if rca_model is None:
+        # fallback demo
+        comp=random.choice(list(rca_actions.keys()))
+        root,corrective,preventive=rca_actions[comp]
+        return comp,root,corrective,preventive
+
+    x=torch.tensor([[temp,vibration,load,cycles]],dtype=torch.float32)
+
+    with torch.no_grad():
+        pred=rca_model(x)
+        comp_id=torch.argmax(pred).item()
+
+    component=component_decoder[comp_id]
+    root,corrective,preventive=rca_actions[component]
+
+    return component,root,corrective,preventive
+@app.get("/stream")
+def stream_rca():
+
+    global RCA_ID
+
+    # Simulated telemetry from fleet
+    temp=random.uniform(70,130)
+    vibration=random.uniform(10,100)
+    load=random.uniform(20,150)
+    cycles=random.randint(100,6000)
+
+    component,root,corrective,preventive=rca_predict(temp,vibration,load,cycles)
+
+    vehicles=random.randint(100,4000)
+    failures=random.randint(20,1500)
+
+    case={
+        "id":RCA_ID,
+        "component":component,
+        "root":root,
+        "corrective":corrective,
+        "preventive":preventive,
+        "status":rca_status(vehicles),
+        "vehicles":vehicles,
+        "failures":failures,
+        "models":["Model A 2022","Model B 2023"],
+        "years":"2022-2024"
+    }
+
+    RCA_CASES.insert(0,case)
+    RCA_ID+=1
+
+    return {"generated":True}
+@app.get("/cases")
+def get_cases():
+    return RCA_CASES
