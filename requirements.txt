@@ -3,18 +3,5 @@ uvicorn
 pydantic
 joblib
 pandas
-numpy
+scikit-learn
 python-multipart
-
-# ML
-scikit-learn==1.6.1
-xgboost
-mlxtend
-prophet
-
-# Deep learning (RCA model)
-torch==2.2.2
-
-# optional but recommended
-uvloop
-httptools

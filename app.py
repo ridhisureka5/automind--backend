@@ -7,8 +7,7 @@ import pandas as pd
 import os
 import time
 import random
-import torch
-import torch.nn as nn
+
 
 # ===========================
 # APP SETUP
@@ -241,50 +240,7 @@ live_vehicle_data: Dict[str, dict] = {}
 # ===========================
 # DATA MODELS
 # ===========================
-# =========================================================
-# RCA CAPA AI ENGINE
-# =========================================================
 
-class RCAModel(nn.Module):
-    def __init__(self, out_size):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(4,64),
-            nn.ReLU(),
-            nn.Linear(64,128),
-            nn.ReLU(),
-            nn.Linear(128,64),
-            nn.ReLU(),
-            nn.Linear(64,out_size)
-        )
-
-    def forward(self,x):
-        return self.net(x)
-
-
-# -------- LOAD MODEL SAFELY --------
-try:
-    component_decoder = joblib.load("component_decoder.pkl")
-    rca_actions = joblib.load("rca_actions.pkl")
-
-    rca_model = RCAModel(len(component_decoder))
-    rca_model.load_state_dict(torch.load("rca_model.pt", map_location="cpu"))
-    rca_model.eval()
-
-    print("✅ RCA CAPA AI Loaded")
-
-except Exception as e:
-    print("⚠️ RCA AI Demo Mode:", e)
-    rca_model = None
-    rca_actions = {
-        "Battery":("Thermal degradation","Replace supplier","Improve cooling"),
-        "Cooling":("Coolant inefficiency","Pump replacement","Add monitoring"),
-        "Motor":("Rotor wear","Replace motor","Lubrication schedule"),
-        "Brake":("Pad wear","Replace pads","Predictive maintenance"),
-        "Sensor":("Calibration drift","Recalibrate sensor","Self diagnostics"),
-        "Transmission":("Gear wear","Replace gearbox","Oil monitoring")
-    }
-    component_decoder = list(rca_actions.keys())
 class OBD(BaseModel):
     rpm: int
     speed_kmph: int
