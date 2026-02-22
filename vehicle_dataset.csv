@@ -1,0 +1,21 @@
+vin,car_name,mileage,engine_temp,brake_wear,battery_voltage,error_codes,failure
+VIN001,Hyundai Creta 2024,45000,95,60,12.2,2,1
+VIN002,Tata Nexon 2023,30000,88,40,12.5,1,0
+VIN003,Mahindra XUV700,52000,102,70,11.9,3,1
+VIN004,Kia Seltos 2024,28000,85,35,12.7,0,0
+VIN005,Toyota Fortuner,60000,110,80,11.7,4,1
+VIN006,Honda City 2024,22000,82,25,12.8,0,0
+VIN007,MG Hector,48000,98,65,12.1,2,1
+VIN008,Volkswagen Virtus,35000,90,50,12.4,1,0
+VIN009,Skoda Slavia,41000,92,55,12.3,2,1
+VIN010,Maruti Brezza,18000,78,20,12.9,0,0
+VIN011,Hyundai Venue 2023,27000,84,30,12.6,0,0
+VIN012,Tata Harrier,55000,105,75,11.8,3,1
+VIN013,Mahindra Scorpio N,47000,97,62,12.0,2,1
+VIN014,Nissan Magnite,25000,86,32,12.6,1,0
+VIN015,Renault Kiger,33000,89,45,12.4,1,0
+VIN016,Jeep Compass,62000,112,85,11.6,4,1
+VIN017,Toyota Innova,50000,100,68,12.0,3,1
+VIN018,Hyundai i20,21000,80,28,12.7,0,0
+VIN019,Tata Punch,26000,83,33,12.6,0,0
+VIN020,Kia Sonet,39000,93,58,12.2,2,1

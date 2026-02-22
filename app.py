@@ -2,6 +2,7 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Optional
+import numpy as np
 import joblib
 import pandas as pd
 import os
@@ -23,6 +24,18 @@ app.add_middleware(
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = joblib.load("predictive_model.pkl")
+
+df = pd.read_csv("vehicle_dataset.csv")
+def severity_level(prob):
+    if prob > 0.8:
+        return "critical"
+    elif prob > 0.6:
+        return "high"
+    elif prob > 0.4:
+        return "medium"
+    else:
+        return "low"
 
 # ===========================
 # MODEL LOADER (SAFE CLOUD LOADER)
@@ -875,3 +888,52 @@ def technician_analytics():
         },
         "technicians":technicians
     }
+@app.get("/predict-alerts")
+def predict_alerts():
+
+    results = []
+
+    for _, row in df.iterrows():
+
+        features = np.array([[ 
+            row.mileage,
+            row.engine_temp,
+            row.brake_wear,
+            row.battery_voltage,
+            row.error_codes
+        ]])
+
+        prob = model.predict_proba(features)[0][1]
+        level = severity_level(prob)
+
+        if level in ["medium","high","critical"]:
+
+            results.append({
+                "car_name": row.car_name,
+                "vin": row.vin,
+                "failure_probability": round(float(prob),2),
+                "level": level
+            })
+
+    return {"alerts": results}
+
+
+@app.get("/predict-services")
+def predict_services():
+
+    services = []
+
+    for _, row in df.iterrows():
+
+        days_left = max(0, 100000 - row.mileage) // 1000
+        tag = "AI Predicted" if row.failure == 1 else "Scheduled"
+
+        services.append({
+            "car_name": row.car_name,
+            "vin": row.vin,
+            "city": "Auto Assigned",
+            "tag": tag,
+            "service_due_in_km": days_left
+        })
+
+    return {"services": services}
