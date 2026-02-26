@@ -10,11 +10,18 @@ import time
 import random
 
 
+
+
 # ===========================
 # APP SETUP
 # ===========================
 
+
+
+
+
 app = FastAPI(title="AutoMind Backend")
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -25,6 +32,12 @@ app.add_middleware(
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 model = joblib.load("predictive_model.pkl")
+
+
+
+
+   
+
 
 df = pd.read_csv("vehicle_dataset.csv")
 def severity_level(prob):
@@ -937,3 +950,6 @@ def predict_services():
         })
 
     return {"services": services}
+
+
+
